@@ -1,0 +1,103 @@
+---
+title: "Homework 5"
+author: "Nithila Sathiya"
+date: "2024-02-23"
+output: pdf_document
+---
+
+```{r setup, echo = FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(mosaic)
+library(ggplot2)
+library(knitr)
+```
+
+# Problem 1
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+sim_sec = do(100000)*nflip(n=2021, prob=0.024)
+ggplot(sim_sec) + 
+  geom_histogram(aes(x=nflip), binwidth=0.5) + xlab("Number of Flagged Trades") + ylab("Count") + ggtitle("Probability Distribution of Trades")
+sim_sec1 = rbinom(n=100000, size = 2021, prob = 0.024)
+sec_p = sum(sim_sec1 >= 70)/100000
+```
+The null hypothesis states that trades from the Iron Bank are flagged at the same 2.4% baseline rate as trades from other banks. I used the p-value test statistic to measure the evidence against the null hypothesis by conducting a Monte Carlo simulation of 100,000 simulations. The p-value is `r sec_p`. Since the p-value is less than 0.5 it is statistically significant. This means that 70 flagged cases out of 2021 trades does not fall within the 2.4% baseline rate and is just an off chance occurrence. Instead, we reject the null hypothesis and state that the Iron Bank's flagged trades should be investigated.
+
+# Problem 2
+```{r echo = FALSE, message = FALSE, message = FALSE}
+sim_health = do(100000)*nflip(n=50, prob = 0.03)
+ggplot(sim_health) + 
+  geom_histogram(aes(x=nflip), binwidth=0.5) + xlab("Number of Health Code Violations") + ylab("Count") + ggtitle("Probability Distribution of Health Inspections")
+sim_health1 = rbinom(n=100000, size = 50, prob = 0.03)
+health_p = sum(sim_health1 >= 8)/100000
+
+```
+The null hypothesis of this test is that Gourmet Bites' rate of health code violations is higher than the citywide average of 3% by random chance and is not a cause for concern. To solve test the null hypothesis I found the p-value by conducting a Monte Carlo simulation with 100,000 simulations. By conducting the simulation and finding which simulations resulted in a number greater than 8 (the number of violations by Gourmet Bites), we found the p-value of `r health_p`. Since this p-value is less than 0.5 it is statistically significant and demonstrates that Gourmet Bites' 8 violations are concerning and the Health Department should take action.
+
+# Problem 3
+
+## Part A
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+text <- readLines(con = "brown_sentences.txt", n = -1L, ok = TRUE, warn = TRUE, encoding = "unknown", skipNul = FALSE)
+
+letter_freq <- read.csv("letter_frequencies.csv")
+
+calculate_chi_squared = function(sentence, freq_table) {
+  
+  # Ensure letter frequencies are normalized and sum to 1
+  freq_table$Probability = freq_table$Probability / sum(freq_table$Probability)
+  
+  # Remove non-letters and convert to uppercase
+  clean_sentence = gsub("[^A-Za-z]", "", sentence)
+  clean_sentence = toupper(clean_sentence)
+  
+  # Count the occurrences of each letter in the sentence
+  observed_counts = table(factor(strsplit(clean_sentence, "")[[1]], levels = freq_table$Letter))
+  
+  # Calculate expected counts
+  total_letters = sum(observed_counts)
+  expected_counts = total_letters * freq_table$Probability
+  
+  # Chi-squared statistic
+  chi_squared_stat = sum((observed_counts - expected_counts)^2 / expected_counts)
+  
+  return(chi_squared_stat)
+}
+
+chi_squared_text <- data.frame(chi_sq = numeric())
+
+for (i in text) {
+  chi_squared_text <- rbind(chi_squared_text, calculate_chi_squared(i, letter_freq))
+}
+
+colnames(chi_squared_text) <- c("chi_sq")
+
+ggplot(chi_squared_text, aes(x = chi_sq)) + geom_histogram(color = "black", fill = "skyblue") + labs(x = "Chi-Squared Value", y = "Frequency", title = "Chi-Squared Distribution")
+
+```
+
+## Part B
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museum’s new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+sentences_p_value <- data.frame(p_value = numeric())
+
+for (i in sentences) {
+  sentence_chi = calculate_chi_squared(i, letter_freq)
+  sentence_p = round(sum(chi_squared_text >= sentence_chi)/56745, 3)
+  sentences_p_value <- rbind(sentences_p_value, sentence_p)
+}
+sentences_p_value$sentence <- 1:10
+kable(sentences_p_value, format = "markdown", col.names = c("P-Value", "Sentence #"))
+```
+Sentence 6 was produced by an LLM. The p-value of sentence 6 is 0.009 which is less than 0.05, meaning that it is statistically significant. Since it is statistically significant, it proves that the sentence does not follow the typical English letter distribution and falls outside the chi-squared null distribution that was calculated in Part A. This means Sentence 6's letter distribution is atypical and is watermarked by the LLM. 
